@@ -362,8 +362,14 @@ def serve(
     from .web.server import create_app
 
     cfg = load_config()
+    # Lock the Host header to localhost by default (anti DNS-rebinding). If the
+    # user deliberately binds elsewhere, they've opted into exposure — allow any.
+    if host in ("127.0.0.1", "localhost", "::1"):
+        allowed_hosts = ["localhost", "127.0.0.1"]
+    else:
+        allowed_hosts = ["*"]
     console.print(f"[bold]filesearch web UI[/] → http://{host}:{port}")
-    uvicorn.run(create_app(cfg), host=host, port=port, log_level="warning")
+    uvicorn.run(create_app(cfg, allowed_hosts=allowed_hosts), host=host, port=port, log_level="warning")
 
 
 @app.command()

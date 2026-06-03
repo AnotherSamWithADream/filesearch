@@ -128,18 +128,27 @@ async function doSearch() {
     const right = `<span class="right">${esc(h.match_type)} · ${(h.score*100|0)}% · ${fmtSize(h.size)} · ${fmtDate(h.mtime)}</span>`;
     const summary = h.summary ? `<div class="summary">${esc(h.summary)}</div>` : "";
     const snip = h.snippet ? `<div class="snippet">${hl(h.snippet)}</div>` : "";
-    const pj = JSON.stringify(h.path);
+    // Path goes into HTML attributes only via esc() (escapes quotes); never into
+    // inline JS. Clicks are handled by delegation below, reading data-path.
+    const p = esc(h.path);
     return `<div class="hit">${right}
-      <h3><a onclick='open_(${pj},false)'>${esc(h.name)}</a></h3>
-      <div class="path">${esc(h.path)}</div>
+      <h3><a class="open" role="button" tabindex="0" data-path="${p}" data-reveal="0">${esc(h.name)}</a></h3>
+      <div class="path">${p}</div>
       ${summary}${snip}
       <div class="chips">${cat}${tags}</div>
       <div class="actions">
-        <button onclick='open_(${pj},false)'>Open</button>
-        <button onclick='open_(${pj},true)'>Show in folder</button>
+        <button class="open" data-path="${p}" data-reveal="0">Open</button>
+        <button class="open" data-path="${p}" data-reveal="1">Show in folder</button>
       </div></div>`;
   }).join("");
 }
+
+// Event delegation: read the (already HTML-escaped) path from data-path. This
+// avoids interpolating untrusted filenames into inline onclick handlers (XSS).
+$("results").addEventListener("click", (e) => {
+  const el = e.target.closest(".open");
+  if (el) open_(el.dataset.path, el.dataset.reveal === "1");
+});
 
 $("go").onclick = doSearch;
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });

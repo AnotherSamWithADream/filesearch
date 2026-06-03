@@ -28,7 +28,9 @@ def main() -> int:
     )
     Indexer(cfg).run_scan()
 
-    client = TestClient(create_app(cfg))
+    # base_url sets the Host header to a value TrustedHostMiddleware allows
+    # (the default "testserver" is now correctly rejected).
+    client = TestClient(create_app(cfg), base_url="http://127.0.0.1")
     failures = []
 
     r = client.get("/api/status")

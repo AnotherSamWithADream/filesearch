@@ -16,6 +16,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from ..config import Config
 from ..db import Index
@@ -42,8 +43,15 @@ def _open_path(path: str, reveal: bool) -> None:
         subprocess.run(["xdg-open", target], check=False)
 
 
-def create_app(cfg: Config) -> FastAPI:
+def create_app(cfg: Config, allowed_hosts: list[str] | None = None) -> FastAPI:
     app = FastAPI(title="filesearch", version="0.1.0")
+    # Reject requests whose Host header isn't localhost. This blocks DNS-rebinding
+    # attacks, where a malicious page rebinds its domain to 127.0.0.1 to become
+    # same-origin with this local API and drive /api/search and /api/open.
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts or ["localhost", "127.0.0.1"],
+    )
     engine = SearchEngine(cfg)
     index = engine.index
 
