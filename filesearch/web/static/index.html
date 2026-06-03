@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>filesearch</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
+    --fg: #e6e8ee; --muted: #8b93a7; --accent: #6ea8fe; --accent2: #3b82f6;
+    --mark: #ffd866; --chip: #2a3140;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  }
+  header {
+    position: sticky; top: 0; background: rgba(15,17,21,.92);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
+    padding: 14px 20px; z-index: 5;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .title { font-weight: 700; font-size: 18px; letter-spacing: .3px; }
+  .title span { color: var(--accent); }
+  .status { color: var(--muted); font-size: 12px; margin-left: auto; }
+  main { max-width: 980px; margin: 0 auto; padding: 18px 20px 60px; }
+  input, select, button {
+    background: var(--panel2); color: var(--fg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 11px; font-size: 14px; outline: none;
+  }
+  input:focus, select:focus { border-color: var(--accent2); }
+  #q { flex: 1; min-width: 240px; font-size: 15px; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent2); border-color: var(--accent2); color: #fff; font-weight: 600; }
+  button.primary:hover { background: #2f74e0; }
+  .filters { margin-top: 10px; }
+  .filters input { width: 150px; }
+  .meta { color: var(--muted); font-size: 12px; margin: 14px 2px 8px; }
+  .hit {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 13px 15px; margin-bottom: 11px;
+  }
+  .hit h3 { margin: 0 0 3px; font-size: 15px; word-break: break-word; }
+  .hit h3 a { color: var(--accent); text-decoration: none; cursor: pointer; }
+  .hit h3 a:hover { text-decoration: underline; }
+  .path { color: var(--muted); font-size: 12px; word-break: break-all; margin-bottom: 6px; }
+  .summary { margin: 6px 0; }
+  .snippet { color: #c4cad8; font-size: 13px; margin: 6px 0; white-space: pre-wrap; }
+  .snippet mark { background: var(--mark); color: #1a1a1a; border-radius: 3px; padding: 0 2px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+  .chip { background: var(--chip); color: #b9c2d6; border-radius: 999px; padding: 2px 9px; font-size: 11px; }
+  .badge { background: #233047; color: var(--accent); }
+  .right { float: right; color: var(--muted); font-size: 11px; }
+  .actions { margin-top: 9px; display: flex; gap: 8px; }
+  .actions button { padding: 5px 10px; font-size: 12px; }
+  .empty { color: var(--muted); text-align: center; padding: 50px 0; }
+  .spin { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <div class="title">file<span>search</span></div>
+    <div class="status" id="status">loading…</div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <input id="q" placeholder="Search your files by keyword or meaning…" autofocus />
+    <select id="mode" title="Search mode">
+      <option value="hybrid">Hybrid</option>
+      <option value="keyword">Keyword</option>
+      <option value="semantic">Semantic</option>
+    </select>
+    <button class="primary" id="go">Search</button>
+  </div>
+  <div class="row filters">
+    <input id="ext" placeholder="ext filter, e.g. pdf,docx" />
+    <input id="category" placeholder="category, e.g. finance" />
+  </div>
+</header>
+<main>
+  <div class="meta" id="meta"></div>
+  <div id="results"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hl = (s) => esc(s).replace(/\[\[/g, "<mark>").replace(/\]\]/g, "</mark>");
+const fmtSize = (b) => { if(!b) return ""; const u=["B","KB","MB","GB"]; let i=0,n=b; while(n>=1024&&i<u.length-1){n/=1024;i++;} return n.toFixed(n<10&&i>0?1:0)+" "+u[i]; };
+const fmtDate = (t) => t ? new Date(t*1000).toLocaleDateString(undefined,{year:"numeric",month:"short",day:"numeric"}) : "";
+
+async function loadStatus() {
+  try {
+    const r = await fetch("/api/status"); const s = await r.json();
+    const m = s.models || {};
+    const sem = s.semantic_available ? "semantic on" : "semantic off";
+    $("status").textContent =
+      `${s.stats.files} files · ${s.stats.ai_tagged} AI-tagged · ${sem} · text:${m.text||"–"} vision:${m.vision||"–"}`;
+  } catch (e) { $("status").textContent = "API unavailable"; }
+}
+
+async function open_(path, reveal) {
+  try {
+    const r = await fetch("/api/open", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({path, reveal})});
+    if (!r.ok) { const d = await r.json().catch(()=>({})); alert(d.detail || "Could not open file"); }
+  } catch (e) { alert("Could not open file"); }
+}
+
+let timer = null;
+async function doSearch() {
+  const q = $("q").value.trim();
+  if (!q) { $("results").innerHTML = ""; $("meta").textContent = ""; return; }
+  $("meta").innerHTML = '<span class="spin">searching…</span>';
+  const params = new URLSearchParams({q, mode: $("mode").value, limit: "30"});
+  if ($("ext").value.trim()) params.set("ext", $("ext").value.trim().replace(/\./g,""));
+  if ($("category").value.trim()) params.set("category", $("category").value.trim());
+  let data;
+  try { data = await (await fetch("/api/search?" + params)).json(); }
+  catch (e) { $("meta").textContent = "search failed"; return; }
+
+  $("meta").textContent = `${data.count} result${data.count===1?"":"s"} · ${data.mode}`;
+  if (!data.hits.length) { $("results").innerHTML = '<div class="empty">No matches.</div>'; return; }
+
+  $("results").innerHTML = data.hits.map(h => {
+    const tags = (h.tags||[]).map(t => `<span class="chip">${esc(t)}</span>`).join("");
+    const cat = h.category ? `<span class="chip badge">${esc(h.category)}</span>` : "";
+    const right = `<span class="right">${esc(h.match_type)} · ${(h.score*100|0)}% · ${fmtSize(h.size)} · ${fmtDate(h.mtime)}</span>`;
+    const summary = h.summary ? `<div class="summary">${esc(h.summary)}</div>` : "";
+    const snip = h.snippet ? `<div class="snippet">${hl(h.snippet)}</div>` : "";
+    const pj = JSON.stringify(h.path);
+    return `<div class="hit">${right}
+      <h3><a onclick='open_(${pj},false)'>${esc(h.name)}</a></h3>
+      <div class="path">${esc(h.path)}</div>
+      ${summary}${snip}
+      <div class="chips">${cat}${tags}</div>
+      <div class="actions">
+        <button onclick='open_(${pj},false)'>Open</button>
+        <button onclick='open_(${pj},true)'>Show in folder</button>
+      </div></div>`;
+  }).join("");
+}
+
+$("go").onclick = doSearch;
+$("q").addEventListener("keydown", e => { if (e.key === "Enter") doSearch(); });
+$("q").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(doSearch, 350); });
+$("mode").onchange = doSearch;
+loadStatus();
+</script>
+</body>
+</html>
