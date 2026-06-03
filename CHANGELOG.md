@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims
 to follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.1-beta] - 2026-06-03
+
+Security-hardening beta. **Supersedes v0.1.0-beta** — please use this one.
+
+### Security
+- **Web UI (XSS):** result actions no longer interpolate file paths into inline
+  `onclick` handlers (a single quote in a file name could break out of the
+  attribute and run script in the local UI's origin). Paths are now passed via
+  HTML-escaped `data-path` attributes with event delegation.
+- **Web API (DNS rebinding):** added `TrustedHostMiddleware` so the local server
+  only accepts `localhost`/`127.0.0.1` `Host` headers by default, blocking
+  rebinding attacks that could otherwise reach `/api/search` and `/api/open`
+  cross-origin. Explicitly binding `--host` to a non-local address opts out.
+
 ## [0.1.0-beta] - 2026-06-03
 
 First public beta. 🎉
@@ -33,16 +47,6 @@ First public beta. 🎉
 - End-to-end smoke tests for the core pipeline, AI tagging + semantic search,
   the web API, and the file watcher.
 
-### Security
-- **Web UI (XSS):** result actions no longer interpolate file paths into inline
-  `onclick` handlers (a single quote in a file name could break out and run
-  script in the local UI's origin). Paths are now passed via HTML-escaped
-  `data-path` attributes with event delegation.
-- **Web API (DNS rebinding):** added `TrustedHostMiddleware` so the local server
-  only accepts `localhost`/`127.0.0.1` `Host` headers by default, blocking
-  rebinding attacks that could otherwise reach `/api/search` and `/api/open`
-  cross-origin. Explicitly binding `--host` to a non-local address opts out.
-
 ### Known limitations
 - Developed and tested primarily on **Windows 11**; macOS/Linux are supported by
   the code but less tested.
@@ -51,4 +55,5 @@ First public beta. 🎉
 - Indexing a very large tree for the first time is slow (one model call per
   file); start narrow with `--root`/`--small` and widen later.
 
+[0.1.1-beta]: https://github.com/AnotherSamWithADream/filesearch/releases/tag/v0.1.1-beta
 [0.1.0-beta]: https://github.com/AnotherSamWithADream/filesearch/releases/tag/v0.1.0-beta

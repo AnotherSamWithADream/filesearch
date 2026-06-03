@@ -6,4 +6,4 @@ semantic vectors), and lets you search by keyword or meaning from a CLI,
 a local web UI, or a desktop window.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

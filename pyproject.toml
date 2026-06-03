@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "filesearch"
-version = "0.1.0"
+version = "0.1.1"
 description = "AI-based file system search: scans your files, tags them with a local Ollama model (chosen by llm-checker), and lets you search by keyword or meaning."
 readme = "README.md"
 requires-python = ">=3.10"

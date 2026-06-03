@@ -44,7 +44,7 @@ def _open_path(path: str, reveal: bool) -> None:
 
 
 def create_app(cfg: Config, allowed_hosts: list[str] | None = None) -> FastAPI:
-    app = FastAPI(title="filesearch", version="0.1.0")
+    app = FastAPI(title="filesearch", version="0.1.1")
     # Reject requests whose Host header isn't localhost. This blocks DNS-rebinding
     # attacks, where a malicious page rebinds its domain to 127.0.0.1 to become
     # same-origin with this local API and drive /api/search and /api/open.
